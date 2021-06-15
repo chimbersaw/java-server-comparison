@@ -1,23 +1,21 @@
 package ru.hse.java.client;
 
+import ru.hse.java.utils.Params;
+
 import java.util.List;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
+import java.util.concurrent.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 public class ClientMain {
-    private static final int N = 20;
-
     public static void main(String[] args) {
+        // only for testing purposes
         try {
             ExecutorService threadPool = Executors.newCachedThreadPool();
-            List<Future<Void>> futures = threadPool.invokeAll(
-                    IntStream.range(0, N).mapToObj(Client::new).collect(Collectors.toList())
+            List<Future<Long>> futures = threadPool.invokeAll(
+                    IntStream.range(0, Params.NUM_CLIENTS).mapToObj(Client::new).collect(Collectors.toList())
             );
-            for (Future<Void> future : futures) {
+            for (Future<Long> future : futures) {
                 future.get();
             }
             threadPool.shutdown();

@@ -1,40 +1,32 @@
 package ru.hse.java.server;
 
-import ru.hse.java.utils.Constants;
-
 import java.io.IOException;
-import java.net.ServerSocket;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public abstract class Server {
-    private volatile boolean isWorking = true;
-    private ServerSocket serverSocket;
-    private ExecutorService serverSocketService;
+    protected volatile AtomicBoolean isWorking = new AtomicBoolean(true);
+    private final ExecutorService serverSocketService = Executors.newSingleThreadExecutor();
 
-    public void start() throws IOException {
-        serverSocketService = Executors.newSingleThreadExecutor();
-        serverSocket = new ServerSocket(Constants.PORT);
-
+    public void start() {
         serverSocketService.submit(() -> {
-            try (ServerSocket ignored = serverSocket) {
-                while (isWorking) {
-                    acceptClients(serverSocket);
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
+            try {
+                acceptClients();
+            } catch (IOException ignored) {
+                shutdown();
             }
         });
     }
 
-    public void shutdown() throws IOException {
-        isWorking = false;
-        serverSocket.close();
-        serverSocketService.shutdown();
-        closeServer();
+    public void shutdown() {
+        if (isWorking.compareAndSet(true, false)) {
+            serverSocketService.shutdown();
+            closeServer();
+        }
     }
 
-    abstract protected void acceptClients(ServerSocket serverSocket);
+    abstract protected void acceptClients() throws IOException;
 
     abstract protected void closeServer();
 }

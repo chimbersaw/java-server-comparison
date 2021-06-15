@@ -1,6 +1,6 @@
 package ru.hse.java.client;
 
-import ru.hse.java.utils.Constants;
+import ru.hse.java.utils.Params;
 import ru.hse.java.utils.Utils;
 
 import java.net.Socket;
@@ -8,7 +8,10 @@ import java.util.Random;
 import java.util.concurrent.Callable;
 import java.util.stream.IntStream;
 
-public class Client implements Callable<Void> {
+import static java.lang.Long.max;
+
+
+public class Client implements Callable<Long> {
     private final int id;
 
     public Client(int id) {
@@ -16,19 +19,27 @@ public class Client implements Callable<Void> {
     }
 
     @Override
-    public Void call() throws Exception {
-        int[] data = generateArray();
-        try (Socket socket = new Socket("localhost", Constants.PORT)) {
-            Utils.writeArray(socket.getOutputStream(), data);
-            int[] sortedData = Utils.readArray(socket.getInputStream());
-            checkData(data, sortedData);
+    public Long call() throws Exception {
+        long sumTime = 0;
+        try (Socket socket = new Socket("localhost", Params.PORT)) {
+            for (int i = 0; i < Params.NUM_REQUESTS_PER_CLIENT; i++) {
+                int[] data = generateArray();
+                long time = System.currentTimeMillis();
+
+                Utils.writeArray(socket.getOutputStream(), data);
+                Utils.readArray(socket.getInputStream());
+
+                sumTime += System.currentTimeMillis() - time;
+
+                Thread.sleep(max(0, Params.CLIENT_DELTA));
+            }
         }
-        return null;
+        return sumTime / Params.NUM_REQUESTS_PER_CLIENT;
     }
 
     private int[] generateArray() {
         Random random = new Random();
-        return IntStream.generate(random::nextInt).limit(Constants.SIZE).toArray();
+        return IntStream.generate(random::nextInt).limit(Params.ARRAY_LENGTH).toArray();
     }
 
     private void checkData(int[] data, int[] sortedData) {
@@ -40,9 +51,9 @@ public class Client implements Callable<Void> {
             }
         }
         if (isOk) {
-            System.out.println("Client " + id + " is OK");
+            System.out.println("Client " + id + " is OK.");
         } else {
-            System.out.println("Client " + id + " fails");
+            System.out.println("Client " + id + " fails.");
         }
     }
 }

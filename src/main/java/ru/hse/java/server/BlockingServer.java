@@ -1,6 +1,6 @@
 package ru.hse.java.server;
 
-
+import ru.hse.java.utils.Params;
 import ru.hse.java.utils.Utils;
 
 import java.io.DataInputStream;
@@ -12,24 +12,31 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import static ru.hse.java.utils.Params.NUM_THREADS;
+
 public class BlockingServer extends Server {
-    private final ExecutorService workerThreadPool = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors() - 2);
+    private ServerSocket serverSocket;
+    private final ExecutorService workerThreadPool = Executors.newFixedThreadPool(NUM_THREADS);
     private final ConcurrentHashMap.KeySetView<ClientData, Boolean> clients = ConcurrentHashMap.newKeySet();
 
     @Override
-    protected void acceptClients(ServerSocket serverSocket) {
-        try {
+    protected void acceptClients() throws IOException {
+        serverSocket = new ServerSocket(Params.PORT);
+        while (isWorking.get()) {
             Socket socket = serverSocket.accept();
             ClientData clientData = new ClientData(socket);
             clients.add(clientData);
             clientData.processClient();
-        } catch (IOException e) {
-            e.printStackTrace();
         }
     }
 
     @Override
     protected void closeServer() {
+        try {
+            serverSocket.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         workerThreadPool.shutdown();
         clients.forEach(ClientData::close);
     }
@@ -61,13 +68,16 @@ public class BlockingServer extends Server {
         public void processClient() {
             requestReader.submit(() -> {
                 try {
-                    int[] data = Utils.readArray(inputStream);
-                    workerThreadPool.submit(() -> {
-                        Utils.bubbleSort(data);
-                        sendResponse(data);
-                    });
-                } catch (IOException e) {
-                    e.printStackTrace();
+                    while (isWorking.get() && socket.isConnected()) {
+                        int[] data = Utils.readArray(inputStream);
+                        workerThreadPool.submit(() -> {
+                            Utils.bubbleSort(data);
+                            sendResponse(data);
+                        });
+                    }
+                } catch (IOException ignored) {
+                } finally {
+                    close();
                 }
             });
         }
