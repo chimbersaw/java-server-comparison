@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+option java_package = "ru.hse.java.proto";
+option java_outer_classname = "ArrayProto";
+
+message Array {
+  int32 size = 1;
+  repeated int32 elem = 2;
+}
